@@ -1,0 +1,17 @@
+{
+  "name": "uber-microservices",
+  "private": true,
+  "workspaces": [
+    "gateway",
+    "user-service",
+    "captain-service",
+    "payment-service"
+  ],
+  "scripts": {
+    "dev": "concurrently -n gateway,user,captain,payment -c blue,green,yellow,magenta \"npm run dev -w gateway\" \"npm run dev -w user-service\" \"npm run dev -w captain-service\" \"npm run dev -w payment-service\"",
+    "start": "concurrently -n gateway,user,captain,payment -c blue,green,yellow,magenta \"npm start -w gateway\" \"npm start -w user-service\" \"npm start -w captain-service\" \"npm start -w payment-service\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}

@@ -1,0 +1,625 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Uber-style Microservices API",
+    "version": "1.0.0",
+    "description": "All requests go through the gateway. User and captain tokens are signed with different secrets, so a token from one service is rejected by the other. Tokens expire after 1 day."
+  },
+  "servers": [{ "url": "/", "description": "This gateway" }],
+  "tags": [
+    { "name": "Gateway", "description": "Gateway status" },
+    { "name": "Users", "description": "Rider accounts, served by user-service" },
+    { "name": "Captains", "description": "Driver accounts, served by captain-service" },
+    { "name": "Payments", "description": "Captain earnings and payouts, served by payment-service. Amounts are whole numbers of paise." }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Gateway"],
+        "summary": "Check gateway health",
+        "operationId": "getGatewayHealth",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The gateway is running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["service", "status"],
+                  "properties": {
+                    "service": { "type": "string", "example": "gateway" },
+                    "status": { "type": "string", "example": "ok" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/register": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Register a user",
+        "operationId": "registerUser",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterUserRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserAuthResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/EmailTaken" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/users/login": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Log in as a user",
+        "operationId": "loginUser",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserAuthResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/InvalidCredentials" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/users/profile": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get the current user",
+        "operationId": "getUserProfile",
+        "security": [{ "userToken": [] }],
+        "responses": {
+          "200": {
+            "description": "The current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["user"],
+                  "properties": {
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/users/logout": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Log out a user",
+        "description": "Blacklists the token, so it can no longer be used.",
+        "operationId": "logoutUser",
+        "security": [{ "userToken": [] }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoggedOut" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/captains/register": {
+      "post": {
+        "tags": ["Captains"],
+        "summary": "Register a captain",
+        "operationId": "registerCaptain",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterCaptainRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Captain created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CaptainAuthResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/EmailTaken" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/captains/login": {
+      "post": {
+        "tags": ["Captains"],
+        "summary": "Log in as a captain",
+        "operationId": "loginCaptain",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CaptainAuthResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/InvalidCredentials" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/captains/profile": {
+      "get": {
+        "tags": ["Captains"],
+        "summary": "Get the current captain",
+        "operationId": "getCaptainProfile",
+        "security": [{ "captainToken": [] }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/CaptainResult" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/captains/status": {
+      "patch": {
+        "tags": ["Captains"],
+        "summary": "Update the current captain's status",
+        "operationId": "updateCaptainStatus",
+        "security": [{ "captainToken": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "$ref": "#/components/schemas/CaptainStatus" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/CaptainResult" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/captains/logout": {
+      "post": {
+        "tags": ["Captains"],
+        "summary": "Log out a captain",
+        "description": "Blacklists the token, so it can no longer be used.",
+        "operationId": "logoutCaptain",
+        "security": [{ "captainToken": [] }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoggedOut" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/payments/balance": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "Get the current captain's balance",
+        "operationId": "getPaymentBalance",
+        "security": [{ "captainToken": [] }],
+        "responses": {
+          "200": {
+            "description": "The balance in paise. It is negative when the captain owes commission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["balance", "currency"],
+                  "properties": {
+                    "balance": { "type": "integer", "example": 40000 },
+                    "currency": { "type": "string", "example": "INR" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" },
+          "503": { "$ref": "#/components/responses/CaptainServiceUnavailable" }
+        }
+      }
+    },
+    "/payments/transactions": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "List the current captain's ledger entries, newest first",
+        "operationId": "listPaymentTransactions",
+        "security": [{ "captainToken": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of ledger entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["transactions", "page", "limit", "total"],
+                  "properties": {
+                    "transactions": { "type": "array", "items": { "$ref": "#/components/schemas/LedgerEntry" } },
+                    "page": { "type": "integer", "example": 1 },
+                    "limit": { "type": "integer", "example": 20 },
+                    "total": { "type": "integer", "example": 2 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" },
+          "503": { "$ref": "#/components/responses/CaptainServiceUnavailable" }
+        }
+      }
+    },
+    "/payments/payouts": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Request a payout",
+        "description": "A captain can have one pending payout at a time.",
+        "operationId": "requestPayout",
+        "security": [{ "captainToken": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount"],
+                "properties": {
+                  "amount": { "type": "integer", "minimum": 1, "description": "In paise", "example": 40000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payout created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["payout"],
+                  "properties": {
+                    "payout": { "$ref": "#/components/schemas/Payout" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": {
+            "description": "A payout is already pending",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Message" },
+                "example": { "message": "A payout is already pending" }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/ServerError" },
+          "503": { "$ref": "#/components/responses/CaptainServiceUnavailable" }
+        }
+      },
+      "get": {
+        "tags": ["Payments"],
+        "summary": "List the current captain's payouts, newest first",
+        "operationId": "listPayouts",
+        "security": [{ "captainToken": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of payouts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["payouts", "page", "limit", "total"],
+                  "properties": {
+                    "payouts": { "type": "array", "items": { "$ref": "#/components/schemas/Payout" } },
+                    "page": { "type": "integer", "example": 1 },
+                    "limit": { "type": "integer", "example": 20 },
+                    "total": { "type": "integer", "example": 1 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" },
+          "503": { "$ref": "#/components/responses/CaptainServiceUnavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "schema": { "type": "integer", "minimum": 1, "default": 1 }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      }
+    },
+    "securitySchemes": {
+      "userToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token from /users/register or /users/login"
+      },
+      "captainToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token from /captains/register or /captains/login"
+      }
+    },
+    "schemas": {
+      "RegisterUserRequest": {
+        "type": "object",
+        "required": ["name", "email", "password"],
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "example": "Asha" },
+          "email": { "type": "string", "format": "email", "example": "asha@example.com" },
+          "password": { "type": "string", "format": "password", "minLength": 8, "maxLength": 72, "example": "password123" }
+        }
+      },
+      "RegisterCaptainRequest": {
+        "type": "object",
+        "required": ["name", "email", "password", "vehicle"],
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "example": "Ravi" },
+          "email": { "type": "string", "format": "email", "example": "ravi@example.com" },
+          "password": { "type": "string", "format": "password", "minLength": 8, "maxLength": 72, "example": "password123" },
+          "vehicle": { "$ref": "#/components/schemas/Vehicle" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "example": "asha@example.com" },
+          "password": { "type": "string", "format": "password", "example": "password123" }
+        }
+      },
+      "Vehicle": {
+        "type": "object",
+        "required": ["type", "color", "plate", "capacity"],
+        "properties": {
+          "type": { "type": "string", "enum": ["car", "motorcycle", "auto"], "example": "car" },
+          "color": { "type": "string", "example": "white" },
+          "plate": { "type": "string", "description": "Stored in uppercase", "example": "DL01AB1234" },
+          "capacity": { "type": "number", "minimum": 1, "example": 4 }
+        }
+      },
+      "CaptainStatus": {
+        "type": "string",
+        "enum": ["active", "inactive"],
+        "example": "active"
+      },
+      "User": {
+        "type": "object",
+        "required": ["_id", "name", "email", "createdAt", "updatedAt"],
+        "properties": {
+          "_id": { "type": "string", "example": "665f1c2e8b3a4d0012ab34cd" },
+          "name": { "type": "string", "example": "Asha" },
+          "email": { "type": "string", "format": "email", "example": "asha@example.com" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Captain": {
+        "type": "object",
+        "required": ["_id", "name", "email", "status", "vehicle", "createdAt", "updatedAt"],
+        "properties": {
+          "_id": { "type": "string", "example": "665f1c2e8b3a4d0012ab34ce" },
+          "name": { "type": "string", "example": "Ravi" },
+          "email": { "type": "string", "format": "email", "example": "ravi@example.com" },
+          "status": { "$ref": "#/components/schemas/CaptainStatus" },
+          "vehicle": { "$ref": "#/components/schemas/Vehicle" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UserAuthResponse": {
+        "type": "object",
+        "required": ["token", "user"],
+        "properties": {
+          "token": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      },
+      "CaptainAuthResponse": {
+        "type": "object",
+        "required": ["token", "captain"],
+        "properties": {
+          "token": { "type": "string" },
+          "captain": { "$ref": "#/components/schemas/Captain" }
+        }
+      },
+      "LedgerEntry": {
+        "type": "object",
+        "required": ["_id", "captainId", "type", "amount", "currency", "idempotencyKey", "createdAt", "updatedAt"],
+        "properties": {
+          "_id": { "type": "string", "example": "665f1c2e8b3a4d0012ab34cf" },
+          "captainId": { "type": "string", "example": "665f1c2e8b3a4d0012ab34ce" },
+          "type": { "type": "string", "enum": ["earning", "commission", "bonus", "adjustment", "payout"], "example": "earning" },
+          "amount": { "type": "integer", "description": "In paise. Positive means credit, negative means debit.", "example": 50000 },
+          "currency": { "type": "string", "example": "INR" },
+          "rideId": { "type": "string", "example": "665f1c2e8b3a4d0012ab34d0" },
+          "payoutId": { "type": "string", "example": "665f1c2e8b3a4d0012ab34d1" },
+          "idempotencyKey": { "type": "string", "example": "ride:665f1c2e8b3a4d0012ab34d0:earning" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Payout": {
+        "type": "object",
+        "required": ["_id", "captainId", "amount", "currency", "status", "createdAt", "updatedAt"],
+        "properties": {
+          "_id": { "type": "string", "example": "665f1c2e8b3a4d0012ab34d1" },
+          "captainId": { "type": "string", "example": "665f1c2e8b3a4d0012ab34ce" },
+          "amount": { "type": "integer", "description": "In paise", "example": 40000 },
+          "currency": { "type": "string", "example": "INR" },
+          "status": { "type": "string", "enum": ["pending", "paid", "failed"], "example": "pending" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "CaptainResult": {
+        "description": "The current captain",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["captain"],
+              "properties": {
+                "captain": { "$ref": "#/components/schemas/Captain" }
+              }
+            }
+          }
+        }
+      },
+      "LoggedOut": {
+        "description": "Logged out",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Message" },
+            "example": { "message": "Logged out" }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid or malformed request body",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Message" }
+          }
+        }
+      },
+      "InvalidCredentials": {
+        "description": "Wrong email or password",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Message" },
+            "example": { "message": "Invalid email or password" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, invalid, expired or logged-out token",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Message" },
+            "example": { "message": "Unauthorized" }
+          }
+        }
+      },
+      "EmailTaken": {
+        "description": "The email is already registered",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Message" },
+            "example": { "message": "Email is already registered" }
+          }
+        }
+      },
+      "CaptainServiceUnavailable": {
+        "description": "The token could not be verified because captain-service is unavailable",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Message" },
+            "example": { "message": "Captain service unavailable" }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Unexpected server error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Message" },
+            "example": { "message": "Internal server error" }
+          }
+        }
+      }
+    }
+  }
+}
